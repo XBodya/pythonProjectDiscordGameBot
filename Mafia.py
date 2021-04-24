@@ -50,9 +50,6 @@ delete_roles = {}
 
 done_lobby = {}
 
-TOKEN = ""
-game_bot = commands.Bot(command_prefix='-')
-
 
 # Ф-ция для генерации номера лобби
 def generate_name_lobby():
@@ -63,14 +60,14 @@ def generate_name_lobby():
     return name
 
 
-class GameBot(commands.Cog):
+class MafiaBot(commands.Cog):
     # INIT
     def __init__(self, bot):
         self.bot = bot
 
     # Ф-ция для создания лобби
     @commands.command(name='creategame')
-    async def create_game_command(self, ctx, *password):
+    async def create_game_command(self, ctx):
         name = generate_name_lobby()
         logins_lobby[name] = None
         await ctx.send('Создано лобби {}, чтобы подключиться введите "-join {}"'.format(name, name))
@@ -164,7 +161,7 @@ class GameBot(commands.Cog):
                     used_votes_in_lobby[name_lobby] = {}
                     for member in data_lobby[name_lobby][:]:
                         used_votes_in_lobby[name_lobby][member.name] = False
-                    status_lobby[name_lobby] = False
+                    status_lobby[name_lobby] = True
                     done_lobby[name_lobby] = True
                 else:
                     await ctx.send('Ой! В лобби должно быть не менее 5 человек')
@@ -177,8 +174,9 @@ class GameBot(commands.Cog):
     @commands.command(name='view')
     async def view_members(self, ctx, name_lobby):
         try:
-            for members in data_lobby[name_lobby]:
-                await ctx.send('В лобби {} находятся: {}'.format(name_lobby, members.display_name))
+            for members in range(len(data_lobby[name_lobby])):
+                await ctx.send('В лобби {} находятся: {}. {}'.format(name_lobby, members,
+                                                                     data_lobby[name_lobby][members].display_name))
         except Exception:
             await ctx.send('Ой! Похоже такого лобби нету(')
 
@@ -205,21 +203,20 @@ class GameBot(commands.Cog):
         try:
             if ctx.author in data_lobby[name_lobby] \
                     and status_lobby[name_lobby] \
-                    and candidate in data_lobby[name_lobby] \
                     and not used_votes_in_lobby[ctx.author.name]:
                 try:
-                    candidate_to_kick[name_lobby][candidate.name] += 1
+                    candidate_to_kick[name_lobby][data_lobby[name_lobby][candidate].name] += 1
                     used_votes_in_lobby[
                         ctx.author.name] = True
-                    await ctx.author.send("Ваш голос против {} засчитан".format(candidate.name))
+                    await ctx.author.send("Ваш голос против {} засчитан".format(data_lobby[name_lobby][candidate]))
                 except KeyError:
                     candidate_to_kick[name_lobby] = {}
-                    candidate_to_kick[name_lobby][candidate.name] = 1
+                    candidate_to_kick[name_lobby][data_lobby[name_lobby][candidate].name] = 1
                     used_votes_in_lobby[
                         ctx.author.name] = True
-                    await ctx.author.send("Ваш голос против {} засчитан".format(candidate.name))
+                    await ctx.author.send("Ваш голос против {} засчитан".format(data_lobby[name_lobby][candidate].name))
         except Exception:
-            await ctx.author.send("Ваш голос против {} не засчитан".format(candidate.name))
+            await ctx.author.send("Ваш голос против {} не засчитан".format(data_lobby[name_lobby][candidate].name))
 
     # Голосование для убийства
     @commands.command(name='votekill')
@@ -227,23 +224,20 @@ class GameBot(commands.Cog):
         try:
             if ctx.channel.split('-')[-1] == 'mafia':
                 if ctx.author in data_lobby[name_lobby] \
-                        and not status_lobby[name_lobby] \
-                        and candidate in data_lobby[
-                    name_lobby] \
-                        and candidate in roles_in_lobby[name_lobby]:
-                    if roles_in_lobby[name_lobby][candidate] not in {'mafia', 'don'} and \
+                        and not status_lobby[name_lobby]:
+                    if roles_in_lobby[name_lobby][data_lobby[name_lobby][candidate]] not in {'mafia', 'don'} and \
                             not used_votes_kill_in_lobby[name_lobby][ctx.author.name]:
                         if roles_in_lobby[name_lobby][ctx.author.name] in 'don':
-                            don_vote[ctx.author.name] = candidate
+                            don_vote[ctx.author.name] = data_lobby[name_lobby][candidate]
                         else:
                             try:
                                 used_votes_kill_in_lobby[name_lobby][ctx.author.name] = True
-                                candidate_to_kill[name_lobby][candidate.name] += 1
+                                candidate_to_kill[name_lobby][data_lobby[name_lobby][candidate]] += 1
                                 await ctx.author.send("Ваш голос на убийство {} засчитан".format(candidate.name))
                             except Exception:
                                 used_votes_kill_in_lobby[name_lobby] = {}
                                 used_votes_kill_in_lobby[name_lobby][ctx.author.name] = True
-                                candidate_to_kill[name_lobby][candidate.name] = 1
+                                candidate_to_kill[name_lobby][data_lobby[name_lobby][candidate]] = 1
                                 await ctx.author.send("Ваш голос на убийство {} засчитан".format(candidate.name))
 
         except Exception:
@@ -255,33 +249,35 @@ class GameBot(commands.Cog):
         try:
             if ctx.channel.split('-')[-1] == 'police':
                 if ctx.author in data_lobby[name_lobby] \
-                        and not status_lobby[name_lobby] and member in data_lobby[name_lobby] \
-                        and not used_police_check[ctx.author.name]:
+                        and not status_lobby[name_lobby] and not used_police_check[ctx.author.name]:
                     try:
                         if police_in_lobby[name_lobby]:
-                            checking = roles_in_lobby[name_lobby][ctx.member.name]
+                            checking = roles_in_lobby[name_lobby][data_lobby[name_lobby][member].name]
                             if checking in {'mafia', 'don'}:
                                 await ctx.channel.send(
-                                    'Выполняю проверку. {} является членом мафии'.format(ctx.member.name))
+                                    'Выполняю проверку. {} является членом мафии'.format(
+                                        data_lobby[name_lobby][member].name))
                             else:
                                 await ctx.channel.send(
-                                    'Выполняю проверку. {} не является членом мафии'.format(ctx.member.name))
+                                    'Выполняю проверку. {} не является членом мафии'.format(
+                                        data_lobby[name_lobby][member].name))
                             used_police_check[ctx.author.name] = True
                     except Exception:
                         pass
             if ctx.channel.split('-')[-1] == 'mafia':
                 if ctx.author in data_lobby[name_lobby] \
-                        and not status_lobby[name_lobby] and member in data_lobby[name_lobby] \
-                        and not used_don_check[ctx.author.name]:
+                        and not status_lobby[name_lobby] and not used_don_check[ctx.author.name]:
                     try:
                         if don_in_lobby[name_lobby]:
-                            checking = roles_in_lobby[name_lobby][ctx.member.name]
+                            checking = roles_in_lobby[name_lobby][data_lobby[name_lobby][member].name]
                             if checking in {'innocent', 'police'}:
                                 await ctx.channel.send(
-                                    'Выполняю проверку. {} является шерифом'.format(ctx.member.name))
+                                    'Выполняю проверку. {} является шерифом'.format(
+                                        data_lobby[name_lobby][member].name))
                             else:
                                 await ctx.channel.send(
-                                    'Выполняю проверку. {} не является шерифом'.format(ctx.member.name))
+                                    'Выполняю проверку. {} не является шерифом'.format(
+                                        data_lobby[name_lobby][member].name))
                             used_don_check[ctx.author.name] = True
                     except Exception:
                         pass
@@ -320,8 +316,9 @@ class GameBot(commands.Cog):
                         if int((str(datetime.datetime.now() - change_time[game]).split(':'))[1]) >= 6:
                             status_lobby[game] ^= True
                             await self.message_all(ctx=None,
-                                                   message=('В лобби {} начинается {}'.format(game, 'ночь' if status_lobby[
-                                                       game] else 'день')),
+                                                   message=(
+                                                       'В лобби {} начинается {}'.format(game, 'ночь' if status_lobby[
+                                                           game] else 'день')),
                                                    name_lobby=game)
                             await self.message_all(ctx=None,
                                                    message=(
@@ -345,8 +342,9 @@ class GameBot(commands.Cog):
                                         await candidate.send(
                                             'По итогу общего голосования, вас выгоняют из лобби {}'.format(game))
                                         await channel_for_lobby[game][0].send(
-                                            'По итогу общего голосования, выгоняют {} из лобби {}'.format(candidate.name,
-                                                                                                          game))
+                                            'По итогу общего голосования, выгоняют {} из лобби {}'.format(
+                                                candidate.name,
+                                                game))
                                         for el in used_votes_in_lobby[game_id]:
                                             used_votes_in_lobby[game_id][el] = False
                                         data_lobby[game].remove(candidate)
@@ -381,8 +379,9 @@ class GameBot(commands.Cog):
                                                 await candidate.send(
                                                     'Вас, убивают в лобби {}'.format(game_id))
                                                 await channel_for_lobby[game][2].send(
-                                                    'По итогу голосования, убивают {} из лобби {}'.format(candidate.name,
-                                                                                                          game_id))
+                                                    'По итогу голосования, убивают {} из лобби {}'.format(
+                                                        candidate.name,
+                                                        game_id))
                                                 for el in used_votes_kill_in_lobby[game_id]:
                                                     used_votes_kill_in_lobby[game_id][el] = False
                                                 data_lobby[game].remove(candidate)
@@ -448,17 +447,19 @@ class GameBot(commands.Cog):
                 print("FAILED")
 
     # Ф-ция для дебага
-    @commands.command(name='checking')
-    async def testing(self, ctx, name_lobby):
-        print(ctx.message.guild.roles)
-        roles = []
-        for role in ctx.message.guild.roles:
-            if role.name in 'Member':
-                roles.append(role)
-        print(roles)
-        print(status_lobby[name_lobby])
+    # @commands.command(name='checking')
+    # async def testing(self, ctx, name_lobby):
+    #     print(ctx.message.guild.roles)
+    #     roles = []
+    #     for role in ctx.message.guild.roles:
+    #         if role.name in 'Member':
+    #             roles.append(role)
+    #     print(roles)
+    #     print(status_lobby[name_lobby])
 
 
 if __name__ == '__main__':
-    game_bot.add_cog(GameBot(game_bot))
+    TOKEN = "TOKEN"
+    game_bot = commands.Bot(command_prefix='-')
+    game_bot.add_cog(MafiaBot(game_bot))
     game_bot.run(TOKEN)
