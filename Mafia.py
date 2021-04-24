@@ -50,7 +50,7 @@ delete_roles = {}
 
 done_lobby = {}
 
-TOKEN = "ODI5MDQ0ODQ0MTc2NjA1MjE1.YGyaLQ.PEYlMo-oLcPqm9nEij2rvCwzxaA"
+TOKEN = ""
 game_bot = commands.Bot(command_prefix='-')
 
 
