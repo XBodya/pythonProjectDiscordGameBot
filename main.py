@@ -9,6 +9,7 @@ class GameBot(SeaBot):
     def __init__(self, bot):
         super().__init__(bot)
         self.bot = bot
+        self.start = datetime.datetime.now()
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -18,6 +19,7 @@ class GameBot(SeaBot):
         print("SUCCESS LOAD")
         self.clear_lobby.start()
         self.go_cycle.start()
+        self.test_time.start()
 
     # Ф-ция для создания лобби
     @commands.command(name='creategame')
@@ -301,8 +303,12 @@ class GameBot(SeaBot):
                                         delete.append(game)
                                     except Exception:
                                         pass
-                                for i in delete:
-                                    del candidate_to_kick[i]
+                                try:
+                                    for i in delete:
+                                        del candidate_to_kick[i]
+                                except Exception:
+                                    pass
+                                change_time[game] = datetime.datetime.now()
                             else:
                                 delete_kill = list()
                                 for game_id in candidate_to_kill:
@@ -360,14 +366,16 @@ class GameBot(SeaBot):
                                             pass
                                     except Exception:
                                         pass
-                                for i in delete_kill:
-                                    del candidate_to_kill[i]
+                                try:
+                                    for i in delete_kill:
+                                        del candidate_to_kill[i]
+                                except Exception:
+                                    pass
+                                change_time[game] = datetime.datetime.now()
                 except Exception:
                     pass
-
         except IndexError:
-            print("NOT FOUND 404")
-
+            print("CYCLE ERROR")
         except Exception:
             pass
 
@@ -386,8 +394,9 @@ class GameBot(SeaBot):
                                            name_lobby=game)
 
                 delete_lobby.append(game)
+                print("CHECKED OK")
             except Exception:
-                pass
+                print("CHECKED FAILED")
         for lobby in delete_lobby:
             try:
                 data_lobby[lobby].clear()
@@ -397,6 +406,11 @@ class GameBot(SeaBot):
                     await member[0].remove_roles(member[1])
             except Exception:
                 print("FAILED")
+
+    @tasks.loop(seconds=15)
+    async def test_time(self):
+        print(self.start, datetime.datetime.now())
+        print(int((str(datetime.datetime.now() - self.start).split(':'))[1]))
 
 
 if __name__ == '__main__':
